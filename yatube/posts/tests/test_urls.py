@@ -53,7 +53,7 @@ class StaticURLTests(TestCase):
     def test_private_page_redirect_if_anonymous(self):
         """Приватные страницы перенаправляют анонимного пользователя."""
         urls = [
-            '/create/', '/posts/1/edit/'
+            '/create/', '/posts/1/edit/', '/posts/1/comment/'
         ]
         for url in urls:
             response = self.guest_client.get(url)

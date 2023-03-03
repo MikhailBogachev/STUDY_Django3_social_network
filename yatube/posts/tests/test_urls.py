@@ -74,7 +74,8 @@ class StaticURLTests(TestCase):
                 response = self.authorized_client.get(address)
                 self.assertTemplateUsed(response, template)
 
-    def test_incorrect_page(self):
+    def test_404_page(self):
         """Несуществующая страница не доступна."""
-        response = self.authorized_client.get('/posts/2/')
+        response = self.authorized_client.get('/nonexist-page/')
         self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
+        self.assertTemplateUsed(response, 'core/404.html')

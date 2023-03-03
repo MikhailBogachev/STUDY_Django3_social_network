@@ -86,7 +86,7 @@ class StaticViewTests(TestCase):
                 'posts/create_post.html'
             ),
             reverse('posts:post_edit', kwargs={'post_id': 1}): (
-                'posts/create_post.html'
+                'posts/create_post.html'           
             ),
         }
         for reverse_name, template in templates_pages_names.items():

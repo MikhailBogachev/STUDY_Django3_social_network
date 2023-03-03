@@ -1,9 +1,9 @@
-from django.shortcuts import render, get_object_or_404, redirect
+from django.shortcuts import render, get_object_or_404, redirect, get_list_or_404
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 # from django.views.decorators.cache import cache_page
 
-from .models import Post, Group, Comment
+from .models import Post, Group, Comment, Follow
 from .forms import PostForm, CommentForm
 from core.utils import paginate
 
@@ -28,7 +28,7 @@ def group_posts(request, slug):
     """Вью для отображения страниц с постами конкретной группы"""
     template: str = 'posts/group_list.html'
     group = get_object_or_404(Group, slug=slug)
-    post_list = Post.objects.filter(group=group)
+    post_list = get_list_or_404(Post, group=group)
     page_number = request.GET.get('page')
     page_obj = paginate(post_list, page_number)
 
@@ -42,8 +42,8 @@ def group_posts(request, slug):
 def profile(request, username):
     template = 'posts/profile.html'
     author = get_object_or_404(User, username=username)
-    post_list = Post.objects.filter(author=author)
-    post_count = post_list.count()
+    post_list = get_list_or_404(Post, author=author)
+    post_count = len(post_list)
     page_number = request.GET.get('page')
     page_obj = paginate(post_list, page_number)
 
@@ -123,3 +123,28 @@ def add_comment(request, post_id):
         comment.post = post
         comment.save()
     return redirect('posts:post_detail', post_id = post_id)
+
+@login_required
+def follow_index(request):
+    following_list = Follow.objects.values_list('author').filter(user=request.user)
+    post_list = get_list_or_404(Post, author__in=following_list)
+    page_number = request.GET.get('page')
+    page_obj = paginate(post_list, page_number)
+    context = {
+        'page_obj': page_obj 
+    }
+    return render(request, 'posts/follow.html', context=context)
+
+@login_required
+def profile_follow(request, username):
+    author = User.objects.get(username=username)
+    follow = Follow(user=request.user, author=author)
+    follow.save()
+    return redirect('posts:follow_index')
+
+@login_required
+def profile_unfollow(request, username):
+    author = User.objects.get(username=username)
+    follow = Follow.objects.get(user=request.user, author=author)
+    follow.delete()
+    return redirect('posts:follow_index')

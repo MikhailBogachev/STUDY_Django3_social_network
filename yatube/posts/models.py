@@ -54,6 +54,7 @@ class Post(models.Model):
     def __str__(self) -> str:
         return self.text[:15]
 
+
 class Comment(models.Model):
     """Модель комментариев к постам"""
     post = models.ForeignKey(
@@ -67,7 +68,7 @@ class Comment(models.Model):
         on_delete=models.CASCADE,
         related_name='comments',
         verbose_name='Автор комментария'
-    ) 
+    )
     text = models.TextField(
         verbose_name='Текст комментария',
         help_text='Введите текст комментария'
@@ -92,4 +93,3 @@ class Follow(models.Model):
         related_name='following',
         verbose_name='Автор'
     )
-    

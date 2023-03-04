@@ -9,11 +9,12 @@ from django import forms
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.cache import cache
 
-from posts.models import Post, Group, Comment
+from posts.models import Post, Group, Comment, Follow
 
 TEMP_MEDIA_ROOT = tempfile.mkdtemp(dir=settings.BASE_DIR)
 
 User = get_user_model()
+
 
 @override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
 class StaticViewTests(TestCase):
@@ -23,12 +24,15 @@ class StaticViewTests(TestCase):
         cls.user = User.objects.create(
             username='User'
         )
+        cls.user_2 = User.objects.create(
+            username='User_2'
+        )
         cls.group = Group.objects.create(
             title='Название группы',
             slug='test-slug',
             description='Описание группы'
         )
-        small_gif = (            
+        small_gif = (
              b'\x47\x49\x46\x38\x39\x61\x02\x00'
              b'\x01\x00\x80\x00\x00\x00\x00\x00'
              b'\xFF\xFF\xFF\x21\xF9\x04\x00\x00'
@@ -45,13 +49,18 @@ class StaticViewTests(TestCase):
             text='Текст поста',
             author=cls.user,
             group=cls.group,
-            image = cls.uploaded
+            image=cls.uploaded
         )
         Comment.objects.create(
             post=cls.post,
-            author = cls.user,
+            author=cls.user,
             text='Текст комментария'
         )
+        Follow.objects.create(
+            user=cls.user_2,
+            author=cls.user
+        )
+
     @classmethod
     def tearDownClass(cls):
         super().tearDownClass()
@@ -63,6 +72,8 @@ class StaticViewTests(TestCase):
         # Создаем авторизованый клиент
         self.authorized_client = Client()
         self.authorized_client.force_login(StaticViewTests.user)
+        self.authorized_client_2 = Client()
+        self.authorized_client_2.force_login(StaticViewTests.user_2)
         cache.clear()
 
     # Проверяем используемые шаблоны
@@ -86,7 +97,7 @@ class StaticViewTests(TestCase):
                 'posts/create_post.html'
             ),
             reverse('posts:post_edit', kwargs={'post_id': 1}): (
-                'posts/create_post.html'           
+                'posts/create_post.html'
             ),
         }
         for reverse_name, template in templates_pages_names.items():
@@ -209,7 +220,7 @@ class StaticViewTests(TestCase):
         self.assertEqual(task_post_text, 'Текст поста')
         self.assertEqual(task_post_author, 'User')
         self.assertEqual(task_is_edit, True)
-    
+
     def test_cache_index_page(self):
         """Кеширование главной страницы работает"""
         response = self.authorized_client.get(reverse('posts:index'))
@@ -222,6 +233,42 @@ class StaticViewTests(TestCase):
         cache.clear()
         response = self.authorized_client.get(reverse('posts:index'))
         self.assertNotContains(response, 'Текст поста')
+
+    def test_follow_unfollow(self):
+        """
+        Авторизованный пользователь может \
+        подписаться/отписаться на/от авторов
+        """
+        sub = Follow.objects.filter(
+            user=StaticViewTests.user,
+            author=StaticViewTests.user
+        )
+        self.assertFalse(sub.count())
+        self.authorized_client.get(
+            reverse(
+                'posts:profile_follow',
+                kwargs={'username': StaticViewTests.user}
+            )
+        )
+        self.assertTrue(sub.count())
+        self.authorized_client.get(
+            reverse(
+                'posts:profile_unfollow',
+                kwargs={'username': StaticViewTests.user}
+            )
+        )
+        self.assertFalse(sub.count())
+
+    def test_follow_page(self):
+        """
+        Новая запись появляется в ленте \
+        у подписавшегося на автора пользователя, \
+        и не появляется у неподписанного
+        """
+        response = self.authorized_client_2.get(reverse('posts:follow_index'))
+        self.assertTrue(response.context.get('page_obj', 0))
+        response = self.authorized_client.get(reverse('posts:follow_index'))
+        self.assertFalse(response.context.get('page_obj', 0))
 
 
 class PaginatorViewTests(TestCase):
@@ -297,6 +344,3 @@ class PaginatorViewTests(TestCase):
             + '?page=2'
         )
         self.assertEqual(len(response.context['page_obj']), 5)
-
-
-

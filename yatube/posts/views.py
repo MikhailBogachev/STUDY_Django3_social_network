@@ -1,11 +1,10 @@
 from django.shortcuts import (
-    render, get_object_or_404, redirect, get_list_or_404
+    render, get_object_or_404, redirect
 )
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
-# from django.views.decorators.cache import cache_page
 
-from .models import Post, Group, Comment, Follow
+from .models import Post, Group, Follow
 from .forms import PostForm, CommentForm
 from core.utils import paginate
 
@@ -16,7 +15,7 @@ User = get_user_model()
 def index(request):
     """Вью для отображения главной страницы с публикациями"""
     template: str = 'posts/index.html'
-    post_list = Post.objects.all()
+    post_list = Post.objects.select_related('author').all()
     page_number = request.GET.get('page')
     page_obj = paginate(post_list, page_number)
 
@@ -30,7 +29,7 @@ def group_posts(request, slug):
     """Вью для отображения страниц с постами конкретной группы"""
     template: str = 'posts/group_list.html'
     group = get_object_or_404(Group, slug=slug)
-    post_list = get_list_or_404(Post, group=group)
+    post_list = group.posts.all()
     page_number = request.GET.get('page')
     page_obj = paginate(post_list, page_number)
 
@@ -43,13 +42,12 @@ def group_posts(request, slug):
 
 def profile(request, username):
     template = 'posts/profile.html'
-    author = User.objects.get(username=username)
-    if Follow.objects.filter(user=request.user, author=author).count():
-        following = True
-    else:
-        following = False
-    post_list = get_list_or_404(Post, author=author)
-    post_count = len(post_list)
+    author = get_object_or_404(User, username=username)
+    following = request.user.is_authenticated and Follow.objects.filter(
+        user=request.user, author=author
+    ).exists()
+    post_list = author.posts.all()
+    post_count = post_list.count()
     page_number = request.GET.get('page')
     page_obj = paginate(post_list, page_number)
 
@@ -64,43 +62,36 @@ def profile(request, username):
 
 def post_detail(request, post_id):
     template = 'posts/post_detail.html'
-    user = request.user
     post = get_object_or_404(Post, pk=post_id)
     form = CommentForm()
-    author = post.author
-    comments = Comment.objects.filter(post_id=post_id)
-    post_count = Post.objects.filter(author=author).count()
+    post_count = post.author.posts.count()
     context = {
-        'user': user,
         'post': post,
         'post_count': post_count,
         'form': form,
-        'comments': comments
     }
     return render(request, template, context)
 
 
 @login_required
 def post_create(request):
-    form = PostForm(request.POST or None)
-    group = Group.objects.all()
+    form = PostForm(
+        request.POST or None,
+        files=request.FILES or None
+    )
     if form.is_valid():
         post = form.save(commit=False)
         post.author = request.user
         post.save()
-        return redirect(f'/profile/{post.author}/', {
-            'form': form,
-        })
+        return redirect(f'/profile/{post.author}/')
     return render(request, 'posts/create_post.html', {
         'form': form,
-        'group': group,
     })
 
 
 @login_required
 def post_edit(request, post_id):
     post = get_object_or_404(Post, pk=post_id)
-    group = Group.objects.all()
     if post.author != request.user:
         return redirect('posts:post_detail', post_id)
     form = PostForm(
@@ -113,7 +104,6 @@ def post_edit(request, post_id):
         'form': form,
         'is_edit': is_edit,
         'post': post,
-        'group': group,
     }
     if form.is_valid():
         form.save()
@@ -137,8 +127,8 @@ def add_comment(request, post_id):
 def follow_index(request):
     following_list = Follow.objects.values_list('author').filter(
         user=request.user
-        )
-    post_list = get_list_or_404(Post, author__in=following_list)
+    )
+    post_list = Post.objects.filter(author__in=following_list)
     page_number = request.GET.get('page')
     page_obj = paginate(post_list, page_number)
     context = {
@@ -149,9 +139,9 @@ def follow_index(request):
 
 @login_required
 def profile_follow(request, username):
-    author = User.objects.get(username=username)
-    follow = Follow(user=request.user, author=author)
-    follow.save()
+    author = get_object_or_404(User, username=username)
+    if author != request.user:
+        Follow.objects.get_or_create(user=request.user, author=author)
     return redirect('posts:follow_index')
 
 

@@ -6,6 +6,7 @@
   {% cache 20 index_page %}
   {% include 'posts/includes/switcher.html' %}
   {% for post in page_obj %}
+    {% if forloop.first %}<hr>{% endif %}
     <ul>
       <li>
         Автор: {{ post.author.get_full_name }}

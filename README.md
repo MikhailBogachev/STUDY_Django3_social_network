@@ -1,7 +1,7 @@
 # yatube_project
 Проект можно посмотреть по [ссылке](http://MikhailBogachev.pythonanywhere.com/ "Деплой на pythonanywhere")
 ### Описание
-Django проект - социальная сеть
+Django проект - социальная сеть \n
 Кое-что из функционала:
 - лента постов
 - лента постов по группам

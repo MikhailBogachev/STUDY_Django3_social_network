@@ -1,5 +1,5 @@
 # yatube_project
-Проект можно посмотреть по [ссылке](http://MikhailBogachev.pythonanywhere.com/ "Деплой на pythonanywhere")
+
 ### Описание
 Django проект - социальная сеть  
 Кое-что из функционала:
